@@ -10,13 +10,26 @@ const studentEmailCookie = "student_email";
 
 export async function submitEmailAction(formData: FormData) {
   const email = normalizeEmail(String(formData.get("email") ?? ""));
-  const saved = await saveStudentEmail(email);
+  const cookieStore = await cookies();
+  const currentEmail = cookieStore.get(studentEmailCookie)?.value ?? "";
 
-  if (!saved || !isCadtEmail(email)) {
+  if (
+    isCadtEmail(currentEmail) &&
+    normalizeEmail(currentEmail) !== email
+  ) {
+    redirect("/home?error=email-locked");
+  }
+
+  if (!isCadtEmail(email)) {
     redirect("/?error=invalid-email");
   }
 
-  const cookieStore = await cookies();
+  const saved = await saveStudentEmail(email);
+
+  if (!saved) {
+    redirect("/?error=invalid-email");
+  }
+
   cookieStore.set(studentEmailCookie, email, {
     httpOnly: true,
     maxAge: 60 * 60 * 24,
@@ -52,10 +65,4 @@ export async function getStudentEmailFromCookie() {
   }
 
   return email;
-}
-
-export async function clearStudentEmailAction() {
-  const cookieStore = await cookies();
-  cookieStore.delete(studentEmailCookie);
-  redirect("/");
 }

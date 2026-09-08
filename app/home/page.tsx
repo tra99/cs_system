@@ -2,7 +2,6 @@ import Image from "next/image";
 import { redirect } from "next/navigation";
 import {
   chooseGroupAction,
-  clearStudentEmailAction,
   getStudentEmailFromCookie,
 } from "../actions";
 import { getGroupSelectionData } from "../lib/students";
@@ -18,6 +17,8 @@ const messages: Record<string, string> = {
   full: "That group is already full. Please choose another available group.",
   "invalid-email": "Please enter your CADT email again before choosing a group.",
   "invalid-group": "That group choice is not available.",
+  "already-selected": "You already chose a group. Your selection is locked.",
+  "email-locked": "This session is already linked to the email shown here.",
 };
 
 function readParam(value: string | string[] | undefined) {
@@ -39,6 +40,7 @@ export default async function HomePage({
   const error = readParam(params.error);
   const selected = readParam(params.selected);
   const { groups, student } = await getGroupSelectionData(email);
+  const hasChosenGroup = Boolean(student?.groupId);
   const groupedTracks = ["Data Science", "Software Engineering"].map(
     (track) => ({
       track,
@@ -81,14 +83,16 @@ export default async function HomePage({
                   : "No group selected yet"}
               </p>
             </div>
-            <form action={clearStudentEmailAction}>
-              <button
-                type="submit"
-                className="h-10 rounded-lg border border-white/30 px-4 font-semibold text-white transition hover:bg-white/12 focus:outline-none focus:ring-4 focus:ring-white/20"
-              >
-                Change email
-              </button>
-            </form>
+            {student?.groupId ? (
+              <div className="rounded-lg border border-[#f0c66d]/40 bg-[#f0c66d]/18 px-4 py-3 text-left sm:text-right">
+                <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#f0c66d]">
+                  Your choice
+                </p>
+                <p className="mt-1 font-semibold text-white">
+                  {student.track} - {student.groupName}
+                </p>
+              </div>
+            ) : null}
           </div>
         </div>
       </section>
@@ -127,6 +131,9 @@ export default async function HomePage({
                 <div className="grid gap-4 md:grid-cols-3">
                   {trackGroups.map((group) => {
                     const soldOut = group.remaining <= 0;
+                    const lockedByChoice = hasChosenGroup && !group.isSelected;
+                    const buttonDisabled =
+                      soldOut || lockedByChoice || group.isSelected;
                     const fillPercent = Math.min(
                       100,
                       Math.round((group.taken / group.capacity) * 100),
@@ -135,7 +142,15 @@ export default async function HomePage({
                     return (
                       <article
                         key={group.id}
-                        className="rounded-lg border border-[#d7e4df] bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-xl hover:shadow-[#102622]/8"
+                        className={`rounded-lg border p-5 shadow-sm transition ${
+                          group.isSelected
+                            ? "border-[#0d6f66] bg-[#f7fffb] ring-4 ring-[#0d6f66]/12"
+                            : "border-[#d7e4df] bg-white"
+                        } ${
+                          lockedByChoice
+                            ? "opacity-65"
+                            : "hover:-translate-y-0.5 hover:shadow-xl hover:shadow-[#102622]/8"
+                        }`}
                       >
                         <div className="mb-5 flex items-center justify-between gap-4">
                           <div
@@ -152,11 +167,17 @@ export default async function HomePage({
                             style={{
                               backgroundColor: soldOut
                                 ? "#fff0f0"
+                                : group.isSelected
+                                  ? "#dff6ed"
                                 : group.softAccent,
                               color: soldOut ? "#b42318" : group.accent,
                             }}
                           >
-                            {soldOut ? "Full" : "In stock"}
+                            {group.isSelected
+                              ? "Your choice"
+                              : soldOut
+                                ? "Full"
+                                : "In stock"}
                           </span>
                         </div>
 
@@ -195,10 +216,14 @@ export default async function HomePage({
                           />
                           <button
                             type="submit"
-                            disabled={soldOut}
+                            disabled={buttonDisabled}
                             className="h-11 w-full rounded-lg bg-[#102622] px-4 text-sm font-semibold text-white transition hover:bg-[#0d6f66] focus:outline-none focus:ring-4 focus:ring-[#0d6f66]/20 disabled:cursor-not-allowed disabled:bg-[#adbbb8]"
                           >
-                            {group.isSelected ? "Selected" : "Choose group"}
+                            {group.isSelected
+                              ? "Your choice"
+                              : lockedByChoice
+                                ? "Already chosen"
+                                : "Choose group"}
                           </button>
                         </form>
                       </article>

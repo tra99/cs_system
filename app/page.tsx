@@ -1,5 +1,6 @@
 import Image from "next/image";
-import { submitEmailAction } from "./actions";
+import { redirect } from "next/navigation";
+import { getStudentEmailFromCookie, submitEmailAction } from "./actions";
 import { CADT_EMAIL_PATTERN } from "./lib/groups";
 
 export const dynamic = "force-dynamic";
@@ -17,6 +18,12 @@ export default async function Home({
 }: {
   searchParams: LoginSearchParams;
 }) {
+  const existingEmail = await getStudentEmailFromCookie();
+
+  if (existingEmail) {
+    redirect("/home");
+  }
+
   const error = readParam((await searchParams).error);
 
   return (

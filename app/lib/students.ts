@@ -19,7 +19,10 @@ export type StudentRecord = {
 
 type ChooseGroupResult =
   | { ok: true }
-  | { ok: false; reason: "invalid-email" | "invalid-group" | "full" };
+  | {
+      ok: false;
+      reason: "invalid-email" | "invalid-group" | "full" | "already-selected";
+    };
 
 const csvHeaders = [
   "email",
@@ -195,6 +198,11 @@ export async function chooseStudentGroup(
   return withWriteLock(async () => {
     const records = await readRecordsUnlocked();
     const existingRecord = findStudent(records, email);
+
+    if (existingRecord?.groupId) {
+      return { ok: false, reason: "already-selected" };
+    }
+
     const takenByOthers = records.filter(
       (record) =>
         record.groupId === group.id && normalizeEmail(record.email) !== email,
