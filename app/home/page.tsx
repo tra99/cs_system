@@ -1,10 +1,8 @@
 import Image from "next/image";
 import { redirect } from "next/navigation";
-import {
-  chooseGroupAction,
-  getStudentEmailFromCookie,
-} from "../actions";
+import { getStudentEmailFromCookie } from "../actions";
 import { getGroupSelectionData } from "../lib/students";
+import { ChooseGroupForm } from "./ChooseGroupForm";
 
 export const dynamic = "force-dynamic";
 
@@ -208,24 +206,20 @@ export default async function HomePage({
                           />
                         </div>
 
-                        <form action={chooseGroupAction} className="mt-5">
-                          <input
-                            type="hidden"
-                            name="groupId"
-                            value={group.id}
-                          />
-                          <button
-                            type="submit"
-                            disabled={buttonDisabled}
-                            className="h-11 w-full rounded-lg bg-[#102622] px-4 text-sm font-semibold text-white transition hover:bg-[#0d6f66] focus:outline-none focus:ring-4 focus:ring-[#0d6f66]/20 disabled:cursor-not-allowed disabled:bg-[#adbbb8]"
-                          >
-                            {group.isSelected
+                        <ChooseGroupForm
+                          groupId={group.id}
+                          track={group.track}
+                          groupName={group.groupName}
+                          disabled={buttonDisabled}
+                          buttonLabel={
+                            group.isSelected
                               ? "Your choice"
                               : lockedByChoice
                                 ? "Already chosen"
-                                : "Choose group"}
-                          </button>
-                        </form>
+                                : "Choose group"
+                          }
+                          remaining={group.remaining}
+                        />
                       </article>
                     );
                   })}
