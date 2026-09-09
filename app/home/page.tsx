@@ -175,7 +175,7 @@ export default async function HomePage({
                               ? "Your choice"
                               : soldOut
                                 ? "Full"
-                                : "In stock"}
+                                : "Available"}
                           </span>
                         </div>
 
