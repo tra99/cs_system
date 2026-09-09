@@ -49,8 +49,8 @@ export function LoginForm({ error }: LoginFormProps) {
             inputMode="email"
             autoCapitalize="none"
             spellCheck={false}
-            placeholder="name@cadt.edu.kh"
-            title="Please use your @cadt.edu.kh email address."
+            placeholder="name@student.cadt.edu.kh"
+            title="Please use your @student.cadt.edu.kh email address."
             aria-describedby="email-note email-error"
             className="email-input h-14 w-full rounded-lg border border-[#b8cbc7] bg-white px-4 pr-12 text-base text-[#102622] shadow-sm outline-none transition placeholder:text-[#7d918d] focus:border-[#0d6f66] focus:ring-4 focus:ring-[#0d6f66]/15"
           />
@@ -61,7 +61,7 @@ export function LoginForm({ error }: LoginFormProps) {
             @
           </span>
           <p id="email-error" className="email-error">
-            Enter a valid email ending in @cadt.edu.kh.
+            Enter a valid email ending in @student.cadt.edu.kh.
           </p>
         </div>
         <p id="email-note" className="mt-3 text-sm text-[#516c67]">
@@ -69,7 +69,7 @@ export function LoginForm({ error }: LoginFormProps) {
         </p>
         {error === "invalid-email" ? (
           <p className="mt-3 rounded-lg border border-[#efb6b6] bg-[#fff4f4] px-3 py-2 text-sm font-semibold text-[#b42318]">
-            Please enter a valid email ending in @cadt.edu.kh.
+            Please enter a valid email ending in @student.cadt.edu.kh.
           </p>
         ) : null}
       </div>

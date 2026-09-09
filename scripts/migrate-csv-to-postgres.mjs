@@ -3,7 +3,7 @@ import { neon } from "@neondatabase/serverless";
 
 const csvPath = process.argv[2] ?? "data/students.csv";
 const databaseUrl = process.env.DATABASE_URL ?? process.env.POSTGRES_URL;
-const cadtEmailRegex = /^[A-Za-z0-9._%+-]+@cadt\.edu\.kh$/i;
+const cadtEmailRegex = /^[A-Za-z0-9._%+-]+@student\.cadt\.edu\.kh$/i;
 
 if (!databaseUrl) {
   throw new Error("DATABASE_URL or POSTGRES_URL must be set.");

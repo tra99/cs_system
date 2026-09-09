@@ -1,8 +1,8 @@
 export const CADT_EMAIL_PATTERN =
-  String.raw`[A-Za-z0-9._%+\-]+@[cC][aA][dD][tT]\.[eE][dD][uU]\.[kK][hH]`;
+  String.raw`[A-Za-z0-9._%+\-]+@[sS][tT][uU][dD][eE][nN][tT]\.[cC][aA][dD][tT]\.[eE][dD][uU]\.[kK][hH]`;
 
 export const CADT_EMAIL_REGEX =
-  /^[A-Za-z0-9._%+-]+@cadt\.edu\.kh$/i;
+  /^[A-Za-z0-9._%+-]+@student\.cadt\.edu\.kh$/i;
 
 export const GROUP_CAPACITY = 32;
 
