@@ -1,5 +1,4 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
-import path from "node:path";
+import { neon } from "@neondatabase/serverless";
 import {
   GROUP_CAPACITY,
   GROUPS,
@@ -24,129 +23,100 @@ type ChooseGroupResult =
       reason: "invalid-email" | "invalid-group" | "full" | "already-selected";
     };
 
-const csvHeaders = [
-  "email",
-  "track",
-  "groupId",
-  "groupName",
-  "createdAt",
-  "updatedAt",
-] as const;
+type StudentRow = {
+  email: string;
+  track: string;
+  groupId: string;
+  groupName: string;
+  createdAt: string;
+  updatedAt: string;
+};
 
-const csvPath = path.join(process.cwd(), "data", "students.csv");
-let writeQueue = Promise.resolve();
+type GroupCountRow = {
+  groupId: string;
+  taken: number | string;
+};
 
-async function withWriteLock<T>(operation: () => Promise<T>) {
-  const run = writeQueue.then(operation, operation);
-  writeQueue = run.then(
-    () => undefined,
-    () => undefined,
-  );
-  return run;
+type ChooseGroupRow = {
+  changed: boolean;
+  alreadySelected: boolean;
+  full: boolean;
+};
+
+let sqlClient: ReturnType<typeof neon> | undefined;
+let setupPromise: Promise<void> | undefined;
+
+function getSql() {
+  const databaseUrl = process.env.DATABASE_URL ?? process.env.POSTGRES_URL;
+
+  if (!databaseUrl) {
+    throw new Error("DATABASE_URL or POSTGRES_URL must be set.");
+  }
+
+  sqlClient ??= neon(databaseUrl);
+  return sqlClient;
 }
 
-async function ensureCsvFile() {
-  await mkdir(path.dirname(csvPath), { recursive: true });
+async function ensureDatabase() {
+  if (!setupPromise) {
+    setupPromise = (async () => {
+      const sql = getSql();
+
+      await sql`
+        CREATE TABLE IF NOT EXISTS student_group_selections (
+          email text PRIMARY KEY,
+          track text NOT NULL DEFAULT '',
+          group_id text NOT NULL DEFAULT '',
+          group_name text NOT NULL DEFAULT '',
+          created_at timestamptz NOT NULL DEFAULT now(),
+          updated_at timestamptz NOT NULL DEFAULT now()
+        )
+      `;
+
+      await sql`
+        CREATE INDEX IF NOT EXISTS student_group_selections_group_id_idx
+        ON student_group_selections (group_id)
+        WHERE group_id <> ''
+      `;
+    })();
+  }
 
   try {
-    await readFile(csvPath, "utf8");
-  } catch {
-    await writeFile(csvPath, `${csvHeaders.join(",")}\n`, "utf8");
+    await setupPromise;
+  } catch (error) {
+    setupPromise = undefined;
+    throw error;
   }
 }
 
-function parseCsv(content: string) {
-  const rows: string[][] = [];
-  let currentRow: string[] = [];
-  let currentValue = "";
-  let quoted = false;
-
-  for (let index = 0; index < content.length; index += 1) {
-    const character = content[index];
-    const nextCharacter = content[index + 1];
-
-    if (quoted) {
-      if (character === '"' && nextCharacter === '"') {
-        currentValue += '"';
-        index += 1;
-      } else if (character === '"') {
-        quoted = false;
-      } else {
-        currentValue += character;
-      }
-      continue;
-    }
-
-    if (character === '"') {
-      quoted = true;
-    } else if (character === ",") {
-      currentRow.push(currentValue);
-      currentValue = "";
-    } else if (character === "\n") {
-      currentRow.push(currentValue);
-      rows.push(currentRow);
-      currentRow = [];
-      currentValue = "";
-    } else if (character !== "\r") {
-      currentValue += character;
-    }
-  }
-
-  if (currentValue || currentRow.length > 0) {
-    currentRow.push(currentValue);
-    rows.push(currentRow);
-  }
-
-  return rows;
+function mapStudent(row: StudentRow): StudentRecord {
+  return {
+    email: row.email,
+    track: row.track,
+    groupId: row.groupId,
+    groupName: row.groupName,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+  };
 }
 
-function formatCsvValue(value: string) {
-  const normalized = value.replace(/\r?\n/g, " ");
+async function getStudent(email: string) {
+  const sql = getSql();
+  const rows = (await sql`
+    SELECT
+      email,
+      track,
+      group_id AS "groupId",
+      group_name AS "groupName",
+      created_at::text AS "createdAt",
+      updated_at::text AS "updatedAt"
+    FROM student_group_selections
+    WHERE email = ${normalizeEmail(email)}
+    LIMIT 1
+  `) as StudentRow[];
 
-  if (/[",\r\n]/.test(normalized)) {
-    return `"${normalized.replaceAll('"', '""')}"`;
-  }
-
-  return normalized;
-}
-
-function formatRecords(records: StudentRecord[]) {
-  const body = records.map((record) =>
-    csvHeaders
-      .map((header) => formatCsvValue(record[header]))
-      .join(","),
-  );
-
-  return `${csvHeaders.join(",")}\n${body.join("\n")}${body.length ? "\n" : ""}`;
-}
-
-async function readRecordsUnlocked() {
-  await ensureCsvFile();
-  const content = await readFile(csvPath, "utf8");
-  const [, ...rows] = parseCsv(content);
-
-  return rows
-    .filter((row) => row.some((value) => value.trim()))
-    .map<StudentRecord>((row) => ({
-      email: row[0] ?? "",
-      track: row[1] ?? "",
-      groupId: row[2] ?? "",
-      groupName: row[3] ?? "",
-      createdAt: row[4] ?? "",
-      updatedAt: row[5] ?? "",
-    }));
-}
-
-async function writeRecordsUnlocked(records: StudentRecord[]) {
-  await ensureCsvFile();
-  await writeFile(csvPath, formatRecords(records), "utf8");
-}
-
-function findStudent(records: StudentRecord[], email: string) {
-  const normalizedEmail = normalizeEmail(email);
-  return records.find(
-    (record) => normalizeEmail(record.email) === normalizedEmail,
-  );
+  const row = rows[0];
+  return row ? mapStudent(row) : undefined;
 }
 
 export async function saveStudentEmail(rawEmail: string) {
@@ -156,26 +126,23 @@ export async function saveStudentEmail(rawEmail: string) {
     return false;
   }
 
-  await withWriteLock(async () => {
-    const records = await readRecordsUnlocked();
-    const existingRecord = findStudent(records, email);
-    const now = new Date().toISOString();
+  await ensureDatabase();
 
-    if (existingRecord) {
-      existingRecord.updatedAt = now;
-    } else {
-      records.push({
-        email,
-        track: "",
-        groupId: "",
-        groupName: "",
-        createdAt: now,
-        updatedAt: now,
-      });
-    }
-
-    await writeRecordsUnlocked(records);
-  });
+  const sql = getSql();
+  await sql`
+    INSERT INTO student_group_selections (
+      email,
+      created_at,
+      updated_at
+    )
+    VALUES (
+      ${email},
+      now(),
+      now()
+    )
+    ON CONFLICT (email) DO UPDATE
+      SET updated_at = now()
+  `;
 
   return true;
 }
@@ -195,54 +162,123 @@ export async function chooseStudentGroup(
     return { ok: false, reason: "invalid-group" };
   }
 
-  return withWriteLock(async () => {
-    const records = await readRecordsUnlocked();
-    const existingRecord = findStudent(records, email);
+  await ensureDatabase();
 
-    if (existingRecord?.groupId) {
-      return { ok: false, reason: "already-selected" };
-    }
+  const sql = getSql();
+  const rows = (await sql`
+    WITH input AS (
+      SELECT
+        ${email}::text AS email,
+        ${group.id}::text AS group_id,
+        ${group.track}::text AS track,
+        ${group.groupName}::text AS group_name,
+        ${GROUP_CAPACITY}::integer AS capacity
+    ),
+    lock_group AS (
+      SELECT pg_advisory_xact_lock(
+        hashtext('student_group_selections'),
+        hashtext((SELECT group_id FROM input))
+      )
+    ),
+    existing AS (
+      SELECT s.group_id
+      FROM student_group_selections AS s
+      JOIN input AS i ON i.email = s.email
+    ),
+    group_counts AS (
+      SELECT COUNT(*)::integer AS taken
+      FROM student_group_selections AS s
+      CROSS JOIN lock_group
+      JOIN input AS i ON i.group_id = s.group_id
+    ),
+    saved AS (
+      INSERT INTO student_group_selections (
+        email,
+        track,
+        group_id,
+        group_name,
+        created_at,
+        updated_at
+      )
+      SELECT
+        email,
+        track,
+        group_id,
+        group_name,
+        now(),
+        now()
+      FROM input
+      WHERE NOT EXISTS (
+        SELECT 1
+        FROM existing
+        WHERE group_id <> ''
+      )
+      AND (SELECT taken FROM group_counts) < (SELECT capacity FROM input)
+      ON CONFLICT (email) DO UPDATE
+        SET
+          track = EXCLUDED.track,
+          group_id = EXCLUDED.group_id,
+          group_name = EXCLUDED.group_name,
+          updated_at = now()
+      WHERE student_group_selections.group_id = ''
+      AND (SELECT taken FROM group_counts) < (SELECT capacity FROM input)
+      RETURNING 1
+    )
+    SELECT
+      EXISTS(SELECT 1 FROM saved) AS "changed",
+      EXISTS(
+        SELECT 1
+        FROM existing
+        WHERE group_id <> ''
+      ) AS "alreadySelected",
+      (SELECT taken FROM group_counts) >= (SELECT capacity FROM input) AS "full"
+  `) as ChooseGroupRow[];
 
-    const takenByOthers = records.filter(
-      (record) =>
-        record.groupId === group.id && normalizeEmail(record.email) !== email,
-    ).length;
+  const result = rows[0];
 
-    if (takenByOthers >= GROUP_CAPACITY) {
-      return { ok: false, reason: "full" };
-    }
-
-    const now = new Date().toISOString();
-    const nextRecord = existingRecord ?? {
-      email,
-      track: "",
-      groupId: "",
-      groupName: "",
-      createdAt: now,
-      updatedAt: now,
-    };
-
-    nextRecord.track = group.track;
-    nextRecord.groupId = group.id;
-    nextRecord.groupName = group.groupName;
-    nextRecord.updatedAt = now;
-
-    if (!existingRecord) {
-      records.push(nextRecord);
-    }
-
-    await writeRecordsUnlocked(records);
+  if (result?.changed) {
     return { ok: true };
-  });
+  }
+
+  if (result?.alreadySelected) {
+    return { ok: false, reason: "already-selected" };
+  }
+
+  if (result?.full) {
+    return { ok: false, reason: "full" };
+  }
+
+  return { ok: false, reason: "invalid-group" };
 }
 
 export async function getGroupSelectionData(email: string) {
-  const records = await readRecordsUnlocked();
-  const student = findStudent(records, email);
+  await ensureDatabase();
+
+  const sql = getSql();
+  const groupCountsPromise = (async () =>
+    (await sql`
+      SELECT
+        group_id AS "groupId",
+        COUNT(*)::integer AS taken
+      FROM student_group_selections
+      WHERE group_id <> ''
+      GROUP BY group_id
+    `) as GroupCountRow[])();
+
+  const [student, groupCountRows] = await Promise.all([
+    getStudent(email),
+    groupCountsPromise,
+  ]);
+
+  const countsByGroup = new Map(
+    groupCountRows.map((row) => [
+      row.groupId,
+      Number(row.taken),
+    ]),
+  );
+
   const groups = GROUPS.map((group) => {
-    const taken = records.filter(
-      (record) => record.groupId === group.id,
-    ).length;
+    const taken = countsByGroup.get(group.id) ?? 0;
 
     return {
       ...group,
