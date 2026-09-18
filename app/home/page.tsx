@@ -127,7 +127,7 @@ export default async function HomePage({
                     </h2>
                   </div>
                   <p className="text-sm font-medium text-[#5e736f]">
-                    32 seats per group
+                    {trackGroups[0]?.capacity} seats per group
                   </p>
                 </div>
 

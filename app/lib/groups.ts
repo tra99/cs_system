@@ -49,7 +49,7 @@ export const GROUPS = [
     id: "se-3",
     track: "Software Engineering",
     groupName: "Group 3",
-    capacity: 31,
+    capacity: 32,
     accent: "#4f5fbf",
     softAccent: "#eff0fc",
   },
