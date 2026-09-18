@@ -1,6 +1,5 @@
 import { neon } from "@neondatabase/serverless";
 import {
-  GROUP_CAPACITY,
   GROUPS,
   getGroupById,
   isCadtEmail,
@@ -9,6 +8,7 @@ import {
 
 export type StudentRecord = {
   email: string;
+  name: string;
   track: string;
   groupId: string;
   groupName: string;
@@ -25,6 +25,7 @@ type ChooseGroupResult =
 
 type StudentRow = {
   email: string;
+  name: string;
   track: string;
   groupId: string;
   groupName: string;
@@ -63,6 +64,22 @@ async function ensureDatabase() {
       const sql = getSql();
 
       await sql`
+        CREATE TABLE IF NOT EXISTS student_roster (
+          email text PRIMARY KEY,
+          name text NOT NULL DEFAULT '',
+          track text NOT NULL,
+          source_group text NOT NULL DEFAULT '',
+          created_at timestamptz NOT NULL DEFAULT now(),
+          updated_at timestamptz NOT NULL DEFAULT now()
+        )
+      `;
+
+      await sql`
+        CREATE INDEX IF NOT EXISTS student_roster_track_idx
+        ON student_roster (track)
+      `;
+
+      await sql`
         CREATE TABLE IF NOT EXISTS student_group_selections (
           email text PRIMARY KEY,
           track text NOT NULL DEFAULT '',
@@ -92,6 +109,7 @@ async function ensureDatabase() {
 function mapStudent(row: StudentRow): StudentRecord {
   return {
     email: row.email,
+    name: row.name,
     track: row.track,
     groupId: row.groupId,
     groupName: row.groupName,
@@ -104,14 +122,17 @@ async function getStudent(email: string) {
   const sql = getSql();
   const rows = (await sql`
     SELECT
-      email,
-      track,
-      group_id AS "groupId",
-      group_name AS "groupName",
-      created_at::text AS "createdAt",
-      updated_at::text AS "updatedAt"
-    FROM student_group_selections
-    WHERE email = ${normalizeEmail(email)}
+      roster.email,
+      roster.name,
+      roster.track,
+      COALESCE(selection.group_id, '') AS "groupId",
+      COALESCE(selection.group_name, '') AS "groupName",
+      COALESCE(selection.created_at, roster.created_at)::text AS "createdAt",
+      COALESCE(selection.updated_at, roster.updated_at)::text AS "updatedAt"
+    FROM student_roster AS roster
+    LEFT JOIN student_group_selections AS selection
+      ON selection.email = roster.email
+    WHERE roster.email = ${normalizeEmail(email)}
     LIMIT 1
   `) as StudentRow[];
 
@@ -129,22 +150,59 @@ export async function saveStudentEmail(rawEmail: string) {
   await ensureDatabase();
 
   const sql = getSql();
-  await sql`
-    INSERT INTO student_group_selections (
-      email,
-      created_at,
-      updated_at
+  const rows = (await sql`
+    WITH roster AS (
+      SELECT email, track
+      FROM student_roster
+      WHERE email = ${email}
+    ),
+    saved AS (
+      INSERT INTO student_group_selections (
+        email,
+        track,
+        created_at,
+        updated_at
+      )
+      SELECT
+        email,
+        track,
+        now(),
+        now()
+      FROM roster
+      ON CONFLICT (email) DO UPDATE
+        SET
+          track = CASE
+            WHEN student_group_selections.group_id = ''
+              THEN EXCLUDED.track
+            ELSE student_group_selections.track
+          END,
+          updated_at = now()
+      RETURNING 1
     )
-    VALUES (
-      ${email},
-      now(),
-      now()
-    )
-    ON CONFLICT (email) DO UPDATE
-      SET updated_at = now()
-  `;
+    SELECT EXISTS(SELECT 1 FROM saved) AS "saved"
+  `) as { saved: boolean }[];
 
-  return true;
+  return rows[0]?.saved ?? false;
+}
+
+async function getRosterStudent(email: string) {
+  const sql = getSql();
+  const rows = (await sql`
+    SELECT
+      email,
+      name,
+      track,
+      created_at::text AS "createdAt",
+      updated_at::text AS "updatedAt"
+    FROM student_roster
+    WHERE email = ${normalizeEmail(email)}
+    LIMIT 1
+  `) as Pick<
+    StudentRecord,
+    "email" | "name" | "track" | "createdAt" | "updatedAt"
+  >[];
+
+  return rows[0];
 }
 
 export async function chooseStudentGroup(
@@ -164,15 +222,25 @@ export async function chooseStudentGroup(
 
   await ensureDatabase();
 
+  const rosterStudent = await getRosterStudent(email);
+
+  if (!rosterStudent) {
+    return { ok: false, reason: "invalid-email" };
+  }
+
+  if (rosterStudent.track !== group.track) {
+    return { ok: false, reason: "invalid-group" };
+  }
+
   const sql = getSql();
   const rows = (await sql`
     WITH input AS (
       SELECT
         ${email}::text AS email,
         ${group.id}::text AS group_id,
-        ${group.track}::text AS track,
+        ${rosterStudent.track}::text AS track,
         ${group.groupName}::text AS group_name,
-        ${GROUP_CAPACITY}::integer AS capacity
+        ${group.capacity}::integer AS capacity
     ),
     lock_group AS (
       SELECT pg_advisory_xact_lock(
@@ -282,15 +350,16 @@ export async function getGroupSelectionData(email: string) {
 
     return {
       ...group,
-      capacity: GROUP_CAPACITY,
       taken,
-      remaining: Math.max(GROUP_CAPACITY - taken, 0),
+      remaining: Math.max(group.capacity - taken, 0),
       isSelected: student?.groupId === group.id,
     };
   });
 
   return {
     student,
-    groups,
+    groups: student
+      ? groups.filter((group) => group.track === student.track)
+      : [],
   };
 }

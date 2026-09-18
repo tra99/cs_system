@@ -29,6 +29,9 @@ function ContinueButton() {
 }
 
 export function LoginForm({ error }: LoginFormProps) {
+  const hasEmailError = error === "invalid-email";
+  const hasRosterError = error === "not-registered";
+
   return (
     <form action={submitEmailAction} className="space-y-5">
       <div>
@@ -67,9 +70,14 @@ export function LoginForm({ error }: LoginFormProps) {
         <p id="email-note" className="mt-3 text-sm text-[#516c67]">
           Use your official CADT email to continue.
         </p>
-        {error === "invalid-email" ? (
+        {hasEmailError ? (
           <p className="mt-3 rounded-lg border border-[#efb6b6] bg-[#fff4f4] px-3 py-2 text-sm font-semibold text-[#b42318]">
             Please enter a valid email ending in @student.cadt.edu.kh.
+          </p>
+        ) : null}
+        {hasRosterError ? (
+          <p className="mt-3 rounded-lg border border-[#efb6b6] bg-[#fff4f4] px-3 py-2 text-sm font-semibold text-[#b42318]">
+            This email is not in the Generation 12.
           </p>
         ) : null}
       </div>

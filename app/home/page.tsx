@@ -38,13 +38,18 @@ export default async function HomePage({
   const error = readParam(params.error);
   const selected = readParam(params.selected);
   const { groups, student } = await getGroupSelectionData(email);
+
+  if (!student) {
+    redirect("/?error=not-registered");
+  }
+
   const hasChosenGroup = Boolean(student?.groupId);
-  const groupedTracks = ["Data Science", "Software Engineering"].map(
-    (track) => ({
+  const groupedTracks = ["Data Science", "Software Engineering"]
+    .map((track) => ({
       track,
       groups: groups.filter((group) => group.track === track),
-    }),
-  );
+    }))
+    .filter(({ groups: trackGroups }) => trackGroups.length > 0);
 
   return (
     <main className="min-h-screen bg-[#eef6f3] font-sans text-[#102622]">

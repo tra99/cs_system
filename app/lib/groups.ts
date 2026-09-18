@@ -4,13 +4,12 @@ export const CADT_EMAIL_PATTERN =
 export const CADT_EMAIL_REGEX =
   /^[A-Za-z0-9._%+-]+@student\.cadt\.edu\.kh$/i;
 
-export const GROUP_CAPACITY = 32;
-
 export const GROUPS = [
   {
     id: "ds-1",
     track: "Data Science",
     groupName: "Group 1",
+    capacity: 25,
     accent: "#0d6f66",
     softAccent: "#e3f4ef",
   },
@@ -18,6 +17,7 @@ export const GROUPS = [
     id: "ds-2",
     track: "Data Science",
     groupName: "Group 2",
+    capacity: 25,
     accent: "#178064",
     softAccent: "#e6f5eb",
   },
@@ -25,6 +25,7 @@ export const GROUPS = [
     id: "ds-3",
     track: "Data Science",
     groupName: "Group 3",
+    capacity: 25,
     accent: "#2b8c6f",
     softAccent: "#ebf7ef",
   },
@@ -32,6 +33,7 @@ export const GROUPS = [
     id: "se-1",
     track: "Software Engineering",
     groupName: "Group 1",
+    capacity: 32,
     accent: "#1f5f9f",
     softAccent: "#e7f0fb",
   },
@@ -39,6 +41,7 @@ export const GROUPS = [
     id: "se-2",
     track: "Software Engineering",
     groupName: "Group 2",
+    capacity: 32,
     accent: "#315bb8",
     softAccent: "#ebeffc",
   },
@@ -46,6 +49,7 @@ export const GROUPS = [
     id: "se-3",
     track: "Software Engineering",
     groupName: "Group 3",
+    capacity: 31,
     accent: "#4f5fbf",
     softAccent: "#eff0fc",
   },

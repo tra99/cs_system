@@ -27,7 +27,7 @@ export async function submitEmailAction(formData: FormData) {
   const saved = await saveStudentEmail(email);
 
   if (!saved) {
-    redirect("/?error=invalid-email");
+    redirect("/?error=not-registered");
   }
 
   cookieStore.set(studentEmailCookie, email, {
