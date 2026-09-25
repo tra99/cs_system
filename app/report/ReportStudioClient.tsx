@@ -24,6 +24,10 @@ import {
   BookOpen,
 } from "lucide-react";
 import { ContractEditor } from "./ContractEditor";
+import { TelegramSendButton } from "./TelegramSendDialog";
+import { InternshipEditor } from "./InternshipEditor";
+import { EnglishInternshipDocument, KhmerInternshipDocument } from "./InternshipContractDocument";
+import { DEFAULT_INTERNSHIP, InternshipProfile } from "./internship";
 import {
   BLANK,
   ContractProfile,
@@ -39,15 +43,17 @@ import {
 } from "./contract";
 
 const CONTRACT_DRAFT_KEY = "cadt-contract-draft";
+const INTERNSHIP_DRAFT_KEY = "cadt-internship-draft";
 
 // Transcript report is hidden from users for now; only the contract is shown.
 // Set to true to bring back the transcript option, score panel and CSV export.
 const TRANSCRIPT_ENABLED = false;
 
-type DocumentType = "transcript" | "contract";
+type DocumentType = "transcript" | "contract" | "internship";
 
 function getDocumentLabel(documentType: DocumentType) {
   if (documentType === "contract") return "Contract EN-KH";
+  if (documentType === "internship") return "Internship Contract EN-KH";
   return "Transcript";
 }
 
@@ -66,8 +72,9 @@ export function ReportStudioClient({ data }: { data: ReportDataResult }) {
   const [studentsData, setStudentsData] = useState<StudentTranscript[]>(data.students);
 
   const [contractProfile, setContractProfile] = useState<ContractProfile>(DEFAULT_CONTRACT);
+  const [internshipProfile, setInternshipProfile] = useState<InternshipProfile>(DEFAULT_INTERNSHIP);
 
-  // Restore the contract draft after mount so server and client render the same markup
+  // Restore the contract drafts after mount so server and client render the same markup
   useEffect(() => {
     try {
       const saved = window.localStorage.getItem(CONTRACT_DRAFT_KEY);
@@ -76,7 +83,22 @@ export function ReportStudioClient({ data }: { data: ReportDataResult }) {
     } catch {
       // Storage blocked or draft corrupt: keep defaults
     }
+    try {
+      const saved = window.localStorage.getItem(INTERNSHIP_DRAFT_KEY);
+      if (saved) setInternshipProfile({ ...DEFAULT_INTERNSHIP, ...JSON.parse(saved) });
+    } catch {
+      // Storage blocked or draft corrupt: keep defaults
+    }
   }, []);
+
+  const handleInternshipChange = (profile: InternshipProfile) => {
+    setInternshipProfile(profile);
+    try {
+      window.localStorage.setItem(INTERNSHIP_DRAFT_KEY, JSON.stringify(profile));
+    } catch {
+      // Storage unavailable: draft lives only in memory
+    }
+  };
 
   const handleContractChange = (profile: ContractProfile) => {
     setContractProfile(profile);
@@ -208,7 +230,11 @@ export function ReportStudioClient({ data }: { data: ReportDataResult }) {
       setIsExporting(true);
       const dataUrl = await toPng(printRef.current, { cacheBust: true, pixelRatio: 2 });
       const link = document.createElement("a");
-      const fileOwner = isTranscript ? baseStudent.name : contractProfile.lecturerNameEn.trim() || "Lecturer";
+      const fileOwner = isTranscript
+        ? baseStudent.name
+        : documentType === "internship"
+          ? internshipProfile.advisorNameEn.trim() || "Advisor"
+          : contractProfile.lecturerNameEn.trim() || "Lecturer";
       link.download = `CADT_${documentLabel.replace(/\s+/g, "_")}_${fileOwner.replace(/\s+/g, "_")}.png`;
       link.href = dataUrl;
       link.click();
@@ -293,14 +319,12 @@ export function ReportStudioClient({ data }: { data: ReportDataResult }) {
               <p className="text-xs text-slate-500">
                 {TRANSCRIPT_ENABLED
                   ? "Generate transcript reports or lecturer contract documents"
-                  : "Generate lecturer contracts in English and Khmer"}
+                  : "Generate lecturer and internship advisor contracts in English and Khmer"}
               </p>
             </div>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            {/* Document type picker is only needed while transcript is enabled */}
-            {TRANSCRIPT_ENABLED && (
             <div className="flex items-center gap-2 mr-0 sm:mr-2">
               <FileText className="size-4 text-[#0d6f66]" />
               <select
@@ -308,11 +332,11 @@ export function ReportStudioClient({ data }: { data: ReportDataResult }) {
                 onChange={(e) => setDocumentType(e.target.value as DocumentType)}
                 className="rounded-lg border border-slate-300 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-800 outline-none focus:border-[#0d6f66]"
               >
-                <option value="transcript">Transcript Report</option>
-                <option value="contract">Contract (EN + KH)</option>
+                {TRANSCRIPT_ENABLED && <option value="transcript">Transcript Report</option>}
+                <option value="contract">Lecturer Contract (EN + KH)</option>
+                <option value="internship">Internship Advisor Contract (EN + KH)</option>
               </select>
             </div>
-            )}
 
             {/* Student Selector */}
             {isTranscript && (
@@ -364,6 +388,8 @@ export function ReportStudioClient({ data }: { data: ReportDataResult }) {
               <Download className="size-4 text-blue-600" />
               <span>{isExporting ? "Saving..." : "Download PNG"}</span>
             </button>
+
+            <TelegramSendButton />
 
             <button
               onClick={handlePrint}
@@ -602,11 +628,19 @@ export function ReportStudioClient({ data }: { data: ReportDataResult }) {
         {/* CONTRACT DETAILS INPUT PANEL (Left Sidebar) */}
         {showEditor && !isTranscript && (
           <aside className="print:hidden lg:col-span-4 lg:sticky lg:top-24 lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto lg:pr-1">
-            <ContractEditor
-              profile={contractProfile}
-              onChange={handleContractChange}
-              onReset={handleContractReset}
-            />
+            {documentType === "internship" ? (
+              <InternshipEditor
+                profile={internshipProfile}
+                onChange={handleInternshipChange}
+                onReset={() => handleInternshipChange(DEFAULT_INTERNSHIP)}
+              />
+            ) : (
+              <ContractEditor
+                profile={contractProfile}
+                onChange={handleContractChange}
+                onReset={handleContractReset}
+              />
+            )}
           </aside>
         )}
 
@@ -961,9 +995,17 @@ export function ReportStudioClient({ data }: { data: ReportDataResult }) {
               className="w-full bg-white p-8 sm:p-12 text-black border border-slate-300 shadow-2xl rounded-sm print:shadow-none print:border-none print:p-0 print:m-0"
               style={{ maxWidth: "820px" }}
             >
-              <EnglishContractDocument profile={contractProfile} />
+              {documentType === "internship" ? (
+                <EnglishInternshipDocument profile={internshipProfile} />
+              ) : (
+                <EnglishContractDocument profile={contractProfile} />
+              )}
               <div className="contract-page-break my-12 border-t-2 border-dashed border-slate-300 print:my-0 print:border-none" />
-              <KhmerContractDocument profile={contractProfile} />
+              {documentType === "internship" ? (
+                <KhmerInternshipDocument profile={internshipProfile} />
+              ) : (
+                <KhmerContractDocument profile={contractProfile} />
+              )}
             </div>
           )}
         </main>

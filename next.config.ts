@@ -2,6 +2,8 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   allowedDevOrigins: ["172.23.32.113", "localhost", "127.0.0.1"],
+  // MTProto client uses Node sockets; load it with require instead of bundling
+  serverExternalPackages: ["teleproto"],
 };
 
 export default nextConfig;

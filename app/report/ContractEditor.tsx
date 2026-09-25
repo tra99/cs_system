@@ -33,17 +33,17 @@ type ContractEditorProps = {
 const INPUT_CLASS =
   "w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-900 outline-none transition focus:border-[#0d6f66] focus:ring-2 focus:ring-[#0d6f66]/15";
 
-function inputClass(isMissing = false) {
+export function inputClass(isMissing = false) {
   return isMissing ? `${INPUT_CLASS} border-amber-400 bg-amber-50` : INPUT_CLASS;
 }
 
-function toNumber(raw: string, min: number) {
+export function toNumber(raw: string, min: number) {
   const parsed = Number(raw.replace(/,/g, ""));
   if (!Number.isFinite(parsed)) return min;
   return Math.max(min, Math.floor(parsed));
 }
 
-function Section({ icon, title, children }: { icon: ReactNode; title: string; children: ReactNode }) {
+export function Section({ icon, title, children }: { icon: ReactNode; title: string; children: ReactNode }) {
   return (
     <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm space-y-3">
       <h3 className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-slate-700">
@@ -55,7 +55,7 @@ function Section({ icon, title, children }: { icon: ReactNode; title: string; ch
   );
 }
 
-function Field({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
+export function Field({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
   return (
     <label className="block space-y-1">
       <span className="text-[11px] font-semibold text-slate-600">{label}</span>
@@ -65,7 +65,7 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
   );
 }
 
-function LangTag({ lang }: { lang: "EN" | "KH" }) {
+export function LangTag({ lang }: { lang: "EN" | "KH" }) {
   return (
     <span
       className={`inline-flex w-7 shrink-0 justify-center rounded px-1 py-1.5 text-[10px] font-bold ${
@@ -78,7 +78,7 @@ function LangTag({ lang }: { lang: "EN" | "KH" }) {
 }
 
 // One English input and one Khmer input for the same field
-function BilingualField({
+export function BilingualField({
   label,
   en,
   kh,
