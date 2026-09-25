@@ -40,6 +40,10 @@ import {
 
 const CONTRACT_DRAFT_KEY = "cadt-contract-draft";
 
+// Transcript report is hidden from users for now; only the contract is shown.
+// Set to true to bring back the transcript option, score panel and CSV export.
+const TRANSCRIPT_ENABLED = false;
+
 type DocumentType = "transcript" | "contract";
 
 function getDocumentLabel(documentType: DocumentType) {
@@ -54,7 +58,9 @@ export function ReportStudioClient({ data }: { data: ReportDataResult }) {
   const [selectedStudentEmail, setSelectedStudentEmail] = useState<string>(
     data.students[0]?.email ?? ""
   );
-  const [documentType, setDocumentType] = useState<DocumentType>("transcript");
+  const [documentType, setDocumentType] = useState<DocumentType>(
+    TRANSCRIPT_ENABLED ? "transcript" : "contract"
+  );
 
   // Local state of student transcripts to allow dynamic score & subject title edits
   const [studentsData, setStudentsData] = useState<StudentTranscript[]>(data.students);
@@ -285,12 +291,16 @@ export function ReportStudioClient({ data }: { data: ReportDataResult }) {
                 Report Generator
               </h1>
               <p className="text-xs text-slate-500">
-                Generate transcript reports or lecturer contract documents
+                {TRANSCRIPT_ENABLED
+                  ? "Generate transcript reports or lecturer contract documents"
+                  : "Generate lecturer contracts in English and Khmer"}
               </p>
             </div>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
+            {/* Document type picker is only needed while transcript is enabled */}
+            {TRANSCRIPT_ENABLED && (
             <div className="flex items-center gap-2 mr-0 sm:mr-2">
               <FileText className="size-4 text-[#0d6f66]" />
               <select
@@ -302,6 +312,7 @@ export function ReportStudioClient({ data }: { data: ReportDataResult }) {
                 <option value="contract">Contract (EN + KH)</option>
               </select>
             </div>
+            )}
 
             {/* Student Selector */}
             {isTranscript && (
