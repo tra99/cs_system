@@ -1,4 +1,5 @@
 import Image from "next/image";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getStudentEmailFromCookie } from "../actions";
 import { getGroupSelectionData } from "../lib/students";
@@ -40,7 +41,7 @@ export default async function HomePage({
   const { groups, student } = await getGroupSelectionData(email);
 
   if (!student) {
-    redirect("/?error=not-registered");
+    redirect("/login?error=not-registered");
   }
 
   const hasChosenGroup = Boolean(student?.groupId);
@@ -64,7 +65,15 @@ export default async function HomePage({
         />
         <div className="absolute inset-0 -z-10 bg-[linear-gradient(115deg,rgba(4,31,29,0.92),rgba(9,80,72,0.78)_48%,rgba(238,246,243,0.74))]" />
 
-        <div className="mx-auto flex min-h-[310px] w-full max-w-6xl flex-col justify-end gap-7 pb-4 pt-16">
+        <div className="mx-auto flex min-h-[310px] w-full max-w-6xl flex-col justify-end gap-7 pb-4 pt-8">
+          <div>
+            <Link
+              href="/"
+              className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3.5 py-1.5 text-xs font-semibold text-white backdrop-blur-md transition hover:bg-white/20"
+            >
+              ← Option Page
+            </Link>
+          </div>
           <div className="max-w-3xl text-white">
             <p className="mb-3 text-sm font-semibold uppercase tracking-[0.2em] text-[#f0c66d]">
               Computer Science

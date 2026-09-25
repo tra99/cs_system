@@ -21,13 +21,13 @@ export async function submitEmailAction(formData: FormData) {
   }
 
   if (!isCadtEmail(email)) {
-    redirect("/?error=invalid-email");
+    redirect("/login?error=invalid-email");
   }
 
   const saved = await saveStudentEmail(email);
 
   if (!saved) {
-    redirect("/?error=not-registered");
+    redirect("/login?error=not-registered");
   }
 
   cookieStore.set(studentEmailCookie, email, {
